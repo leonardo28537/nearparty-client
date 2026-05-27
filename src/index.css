@@ -47,7 +47,7 @@
   .btn {
     @apply inline-flex items-center justify-center gap-2 font-display font-semibold
            rounded-xl px-5 py-2.5 text-sm transition-all duration-200
-           focus:outline-none focus-visible:ring-2 focus-visible:ring-spark-300/60
+           focus:outline-none focus-visible:ring-2 focus-visible:ring-spark-300
            disabled:opacity-40 disabled:pointer-events-none;
   }
 
@@ -68,8 +68,8 @@
   }
 
   .btn-danger {
-    @apply btn bg-blaze/10 text-blaze border border-blaze/20
-           hover:bg-blaze/20 active:scale-[0.97];
+    @apply btn bg-blaze-900 text-blaze-300 border border-blaze-700
+         hover:bg-blaze-800 active:scale-[0.97];
   }
 
   /* ─── Inputs ───────────────────────────────── */
@@ -103,8 +103,8 @@
            text-xs font-display font-semibold uppercase tracking-wider;
   }
 
-  .badge-spark  { @apply badge bg-spark-300/15 text-spark-300; }
-  .badge-blaze  { @apply badge bg-blaze-400/15 text-blaze-400; }
+  .badge-spark  { @apply badge bg-spark-900 text-spark-300; }
+  .badge-blaze  { @apply badge bg-blaze-900 text-blaze-300; }
   .badge-green  { @apply badge bg-emerald-500/15 text-emerald-400; }
   .badge-muted  { @apply badge bg-ink-700 text-ink-400; }
 
