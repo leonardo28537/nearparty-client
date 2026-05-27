@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { Plus, Calendar, Users, CheckCircle2, XCircle, Clock, ChevronRight, Loader } from 'lucide-react'
-import { formatDistanceToNow } from 'date-fns'
+import { Plus, Calendar, Users, CheckCircle2, XCircle, Clock, ChevronRight, Loader, Trash2, AlertTriangle } from 'lucide-react'
+import { formatDistanceToNow, format } from 'date-fns'
 import { es } from 'date-fns/locale'
 import { useEventsStore } from '@/stores/eventsStore'
 import { useAuthStore } from '@/stores/authStore'
@@ -14,9 +14,11 @@ export const DashboardPage = () => {
   const { user }   = useAuthStore()
   const { updateApplicationStatus } = useEventsStore()
 
-  const [myEvents, setMyEvents]   = useState([])
-  const [loading, setLoading]     = useState(true)
-  const [active, setActive]       = useState(null) // selected event for details
+  const [myEvents,   setMyEvents]   = useState([])
+  const [loading,    setLoading]    = useState(true)
+  const [active,     setActive]     = useState(null)
+  const [deleting,   setDeleting]   = useState(null) // id del evento a eliminar
+  const [confirming, setConfirming] = useState(null) // id del evento en confirmación
 
   useEffect(() => {
     const load = async () => {
@@ -24,7 +26,7 @@ export const DashboardPage = () => {
         const { data } = await api.get('/events/mine')
         setMyEvents(data.events || [])
         if (data.events?.length) setActive(data.events[0].id)
-      } catch (err) {
+      } catch {
         toast.error('Error cargando eventos')
       } finally {
         setLoading(false)
@@ -39,12 +41,8 @@ export const DashboardPage = () => {
       setMyEvents((prev) =>
         prev.map((ev) =>
           ev.id === eventId
-            ? {
-                ...ev,
-                applications: ev.applications.map((a) =>
-                  a.id === appId ? { ...a, status } : a
-                ),
-              }
+            ? { ...ev, applications: ev.applications.map((a) =>
+                a.id === appId ? { ...a, status } : a) }
             : ev
         )
       )
@@ -52,9 +50,27 @@ export const DashboardPage = () => {
     }
   }
 
-  const activeEvent = myEvents.find((e) => e.id === active)
-  const pendingApps = activeEvent?.applications?.filter((a) => a.status === 'pending') || []
-  const acceptedApps = activeEvent?.applications?.filter((a) => a.status === 'accepted') || []
+  const handleDelete = async (eventId) => {
+    setDeleting(eventId)
+    try {
+      await api.patch(`/events/${eventId}`, { status: 'cancelled' })
+      setMyEvents((prev) => prev.filter((ev) => ev.id !== eventId))
+      if (active === eventId) {
+        const remaining = myEvents.filter((ev) => ev.id !== eventId)
+        setActive(remaining[0]?.id || null)
+      }
+      setConfirming(null)
+      toast.success('Evento cancelado')
+    } catch {
+      toast.error('Error al cancelar el evento')
+    } finally {
+      setDeleting(null)
+    }
+  }
+
+  const activeEvent   = myEvents.find((e) => e.id === active)
+  const pendingApps   = activeEvent?.applications?.filter((a) => a.status === 'pending')  || []
+  const acceptedApps  = activeEvent?.applications?.filter((a) => a.status === 'accepted') || []
 
   if (loading) return (
     <div className="h-screen flex items-center justify-center">
@@ -65,21 +81,60 @@ export const DashboardPage = () => {
   return (
     <div className="min-h-screen pt-16">
       <div className="max-w-5xl mx-auto px-4 py-8">
-        {/* Page header */}
+
+        {/* Header */}
         <div className="flex items-center justify-between mb-8 animate-fade-up">
           <div>
-            <p className="text-xs font-display font-semibold uppercase tracking-[0.2em] text-spark mb-1">
-              Panel
-            </p>
-            <h1 className="font-display font-bold text-3xl text-ink-100">
-              Mis eventos
-            </h1>
+            <p className="text-xs font-display font-semibold uppercase tracking-[0.2em] text-spark mb-1">Panel</p>
+            <h1 className="font-display font-bold text-3xl text-ink-100">Mis eventos</h1>
           </div>
           <button onClick={() => navigate('/dashboard/new')} className="btn-primary">
-            <Plus size={15} />
-            Nuevo evento
+            <Plus size={15} /> Nuevo evento
           </button>
         </div>
+
+        {/* Modal de confirmación de eliminación */}
+        {confirming && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center px-4"
+               style={{ background: 'rgba(0,0,0,0.7)' }}>
+            <div className="card grain-overlay p-6 max-w-sm w-full animate-fade-up">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-10 h-10 rounded-xl bg-blaze/10 border border-blaze/20
+                                flex items-center justify-center flex-shrink-0">
+                  <AlertTriangle size={18} className="text-blaze" />
+                </div>
+                <div>
+                  <h3 className="font-display font-bold text-ink-100">¿Cancelar evento?</h3>
+                  <p className="text-xs text-ink-500">Esta acción notificará a los invitados</p>
+                </div>
+              </div>
+              <p className="text-sm text-ink-400 mb-6">
+                El evento quedará marcado como cancelado y no aparecerá en el mapa.
+                Los invitados aceptados serán notificados.
+              </p>
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setConfirming(null)}
+                  className="btn-secondary flex-1"
+                  disabled={deleting}
+                >
+                  Volver
+                </button>
+                <button
+                  onClick={() => handleDelete(confirming)}
+                  disabled={!!deleting}
+                  className="btn-danger flex-1"
+                >
+                  {deleting ? (
+                    <><Loader size={13} className="animate-spin" /> Cancelando…</>
+                  ) : (
+                    <><Trash2 size={13} /> Sí, cancelar</>
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
         {myEvents.length === 0 ? (
           <div className="card grain-overlay p-12 text-center animate-fade-up">
@@ -96,7 +151,8 @@ export const DashboardPage = () => {
           </div>
         ) : (
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 animate-fade-in">
-            {/* Event list sidebar */}
+
+            {/* Lista de eventos */}
             <div className="lg:col-span-1 space-y-2">
               <h2 className="font-display font-semibold text-xs uppercase tracking-wider
                              text-ink-500 px-1 mb-3">
@@ -111,8 +167,8 @@ export const DashboardPage = () => {
                     className={clsx(
                       'w-full text-left p-4 rounded-xl border transition-all duration-200',
                       active === ev.id
-                        ? 'bg-ink-700/80 border-spark/30 shadow-[0_0_0_1px_rgba(255,204,77,0.15)]'
-                        : 'bg-ink-800/40 border-[var(--border)] hover:bg-ink-800 hover:border-[var(--border-2)]'
+                        ? 'bg-ink-700/80 border-spark/30'
+                        : 'bg-ink-800/40 border-[var(--border)] hover:bg-ink-800'
                     )}
                   >
                     <div className="flex items-center justify-between mb-1">
@@ -137,28 +193,44 @@ export const DashboardPage = () => {
               })}
             </div>
 
-            {/* Event detail */}
+            {/* Detalle del evento activo */}
             {activeEvent && (
               <div className="lg:col-span-2 space-y-4">
-                {/* Event info */}
+
+                {/* Info + acciones */}
                 <div className="card grain-overlay p-5">
                   <div className="flex items-start justify-between mb-3">
-                    <h2 className="font-display font-bold text-xl text-ink-100">
-                      {activeEvent.title}
-                    </h2>
-                    <Link
-                      to={`/events/${activeEvent.id}`}
-                      className="btn-ghost !px-2.5 !py-1.5 text-xs gap-1"
-                    >
-                      Ver público
-                    </Link>
+                    <div className="flex-1 min-w-0 mr-3">
+                      <h2 className="font-display font-bold text-xl text-ink-100 mb-1">
+                        {activeEvent.title}
+                      </h2>
+                      <p className="text-xs text-ink-500 flex items-center gap-1">
+                        <Clock size={10} />
+                        {format(new Date(activeEvent.starts_at), "d 'de' MMMM · HH:mm", { locale: es })}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-2 flex-shrink-0">
+                      <Link
+                        to={`/events/${activeEvent.id}`}
+                        className="btn-ghost !px-2.5 !py-1.5 text-xs"
+                      >
+                        Ver público
+                      </Link>
+                      <button
+                        onClick={() => setConfirming(activeEvent.id)}
+                        className="btn-danger !px-2.5 !py-1.5 text-xs gap-1.5"
+                        title="Cancelar evento"
+                      >
+                        <Trash2 size={12} /> Cancelar
+                      </button>
+                    </div>
                   </div>
 
                   {/* Stats */}
-                  <div className="grid grid-cols-3 gap-3 mb-0">
+                  <div className="grid grid-cols-3 gap-3">
                     {[
                       { label: 'Confirmados', value: acceptedApps.length, color: 'text-emerald-400' },
-                      { label: 'Pendientes',  value: pendingApps.length,  color: 'text-spark' },
+                      { label: 'Pendientes',  value: pendingApps.length,  color: 'text-spark'       },
                       { label: 'Capacidad',   value: `${acceptedApps.length}/${activeEvent.max_guests}`, color: 'text-ink-300' },
                     ].map(({ label, value, color }) => (
                       <div key={label} className="bg-ink-900/60 rounded-xl p-3 text-center">
@@ -169,7 +241,7 @@ export const DashboardPage = () => {
                   </div>
                 </div>
 
-                {/* Pending applications */}
+                {/* Solicitudes pendientes */}
                 {pendingApps.length > 0 && (
                   <div className="card p-5">
                     <h3 className="font-display font-semibold text-sm uppercase tracking-wider
@@ -215,7 +287,7 @@ export const DashboardPage = () => {
                   </div>
                 )}
 
-                {/* Accepted guests */}
+                {/* Invitados confirmados */}
                 {acceptedApps.length > 0 && (
                   <div className="card p-5">
                     <h3 className="font-display font-semibold text-sm uppercase tracking-wider
