@@ -1,0 +1,12 @@
+services:
+  - type: web
+    name: nearparty-client
+    runtime: static
+    buildCommand: npm install && npm run build
+    staticPublishPath: ./dist
+    pullRequestPreviewsEnabled: false
+    routes:
+      # Redirige todas las rutas al index.html (necesario para React Router)
+      - type: rewrite
+        source: /*
+        destination: /index.html
