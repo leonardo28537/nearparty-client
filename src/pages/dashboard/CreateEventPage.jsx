@@ -34,6 +34,11 @@ export const CreateEventPage = () => {
   })
   const [saving, setSaving] = useState(false)
 
+  // Fecha minima = ahora mismo
+  const minDateTime = new Date(Date.now() - new Date().getTimezoneOffset() * 60000)
+    .toISOString()
+    .slice(0, 16)
+
   const set = (k) => (e) => {
     const v = e.target.type === 'checkbox' ? e.target.checked
              : e.target.type === 'number'  ? +e.target.value
@@ -175,6 +180,7 @@ export const CreateEventPage = () => {
                 <Calendar size={11} /> Fecha y hora
               </label>
               <input className="input" type="datetime-local"
+                min={minDateTime}
                 value={form.starts_at} onChange={set('starts_at')} required />
             </div>
             <div>
